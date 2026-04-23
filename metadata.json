@@ -1,0 +1,6 @@
+{
+  "name": "EliteQuant Market Terminal",
+  "description": "High-performance institutional-grade market intelligence terminal for real-time analysis across global stocks, indices, and crypto.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["Real-time Data", "Advanced Analytics", "Cross-Asset Performance"]
+}
