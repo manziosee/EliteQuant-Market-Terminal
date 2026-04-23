@@ -57,8 +57,12 @@ const App: React.FC = () => {
   }, []);
 
   const fetchPortfolio = async () => {
-    const res = await axios.get('/api/portfolio');
-    setPortfolio(res.data);
+    try {
+      const res = await axios.get('/api/portfolio');
+      setPortfolio(res.data);
+    } catch {
+      // API unavailable — keep default empty portfolio state
+    }
   };
 
   const selectedAssetData = useMemo(() => {
