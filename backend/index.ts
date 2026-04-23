@@ -114,30 +114,27 @@ export function startBackend(app: Express, io: Server) {
 
   // --- Specialized Polling ---
   async function fetchStocks() {
-    try {
-      const symbols = ['SPY', 'QQQ', 'AAPL', 'TSLA'];
-      for (const symbol of symbols) {
-        const res = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`, {
-          params: { interval: '1d', range: '1d' },
-          timeout: 4000
-        });
-        const meta = res.data.chart.result[0].meta;
-        const currentPrice = meta.regularMarketPrice;
-        const prevClose = meta.previousClose;
-        const change = ((currentPrice - prevClose) / prevClose) * 100;
-        
-        const keyMap: any = { 'SPY': 'spy', 'QQQ': 'qqq', 'AAPL': 'apple', 'TSLA': 'tesla' };
-        const key = keyMap[symbol];
-        stockPrices[key] = { usd: currentPrice, change: change };
-        
-        if (priceHistory[key]) {
-          priceHistory[key][priceHistory[key].length - 1] = currentPrice;
+    const symbols = ['SPY', 'QQQ', 'AAPL', 'TSLA'];
+    const keyMap: Record<string, string> = { SPY: 'spy', QQQ: 'qqq', AAPL: 'apple', TSLA: 'tesla' };
+    await Promise.allSettled(
+      symbols.map(async (symbol) => {
+        try {
+          const res = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`, {
+            params: { interval: '1d', range: '1d' },
+            timeout: 4000
+          });
+          const meta = res.data.chart.result[0].meta;
+          const currentPrice = meta.regularMarketPrice;
+          const change = ((currentPrice - meta.previousClose) / meta.previousClose) * 100;
+          const key = keyMap[symbol];
+          stockPrices[key] = { usd: currentPrice, change };
+          if (priceHistory[key]) priceHistory[key][priceHistory[key].length - 1] = currentPrice;
+        } catch {
+          // individual symbol failure — keep existing cached value
         }
-      }
-      broadcastState();
-    } catch (e) {
-      console.warn('Stock Fetch Error');
-    }
+      })
+    );
+    broadcastState();
   }
 
   async function fetchBinance() {
@@ -208,7 +205,14 @@ export function startBackend(app: Express, io: Server) {
    *       200:
    *         description: Full market state object
    */
-  app.get('/api/market/pulse', (req, res) => {
+  app.get('/api/market/pulse', async (_req, res) => {
+    // On a cold start the in-memory cache is empty; fetch Binance (fastest) before responding.
+    if (binanceTickers.length === 0) {
+      await Promise.race([
+        fetchBinance(),
+        new Promise<void>(resolve => setTimeout(resolve, 3000)),
+      ]);
+    }
     res.json(getCurrentState());
   });
 

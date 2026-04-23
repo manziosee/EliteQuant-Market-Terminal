@@ -14,7 +14,11 @@ import NewsSentimentHub from './components/NewsSentimentHub.tsx';
 import PerformanceAnalytics from './components/PerformanceAnalytics.tsx';
 import { Download, Share2 } from 'lucide-react';
 
-const socket = io();
+// In production (Vercel serverless) WebSocket connections are not persistent.
+// Use a no-op object so the REST polling fallback handles all live data instead.
+const socket = process.env.NODE_ENV === 'production'
+  ? ({ on: () => {}, off: () => {}, connected: false } as any)
+  : io();
 
 const App: React.FC = () => {
   const [marketData, setMarketData] = useState<any>({ crypto: {}, binance: [], forex: {}, recentTrades: [], indicators: {} });
@@ -24,18 +28,22 @@ const App: React.FC = () => {
   const [tradeError, setTradeError] = useState<string | null>(null);
 
   useEffect(() => {
-    socket.on('market-data', (data) => {
+    socket.on('market-data', (data: any) => {
       setMarketData(data);
     });
 
+    // Fetch immediately on mount so data is visible before the first poll fires
+    axios.get('/api/market/pulse').then(res => {
+      if (res.data) setMarketData(res.data);
+    }).catch(() => {});
+
     const pollInterval = setInterval(async () => {
-      // Small delay for initial connection attempt
       if (!socket.connected) {
         try {
           const res = await axios.get('/api/market/pulse');
           if (res.data) setMarketData(res.data);
         } catch (e) {
-          // Silent failure for polling to avoid console spam in dev
+          // silent
         }
       }
     }, 10000);
