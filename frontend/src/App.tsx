@@ -268,7 +268,7 @@ const App: React.FC = () => {
               <p className="text-[9px] text-gray-500 leading-relaxed uppercase font-medium">Test trading strategies against live market telemetry using the simulated environment.</p>
             </div>
             <div className="space-y-4">
-              <input type="number" value={tradeAmount} onChange={(e) => setTradeAmount(parseFloat(e.target.value))}
+              <input type="number" value={tradeAmount} onChange={(e) => { const v = parseFloat(e.target.value); setTradeAmount(isNaN(v) ? 0 : v); }}
                      className="w-full p-3 bg-white/[0.03] border border-[#2D3139] rounded-lg text-xs font-mono focus:outline-none focus:border-[#00FF88]" />
               
               {tradeError && (

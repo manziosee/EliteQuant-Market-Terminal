@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
+    "build:api": "esbuild api/index.ts --bundle --packages=external --platform=node --target=node20 --format=esm --outfile=api/handler.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "start": "node server.ts",
@@ -38,6 +39,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "esbuild": "^0.27.7",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/swagger-jsdoc": "^6.0.4",
