@@ -53,20 +53,24 @@ export function startBackend(app: Express, io: Server) {
   };
 
   // --- Swagger Setup ---
-  const swaggerOptions = {
-    definition: {
-      openapi: '3.0.0',
-      info: {
-        title: 'Elite Trade Hub API',
-        version: '1.0.0',
-        description: 'Professional Trading Platform API',
+  try {
+    const swaggerOptions = {
+      definition: {
+        openapi: '3.0.0',
+        info: {
+          title: 'Elite Trade Hub API',
+          version: '1.0.0',
+          description: 'Professional Trading Platform API',
+        },
+        servers: [{ url: '/api' }],
       },
-      servers: [{ url: '/api' }],
-    },
-    apis: ['./backend/index.ts'],
-  };
-  const swaggerDocs = swaggerJsdoc(swaggerOptions);
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+      apis: ['./backend/index.ts'],
+    };
+    const swaggerDocs = swaggerJsdoc(swaggerOptions);
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+  } catch {
+    // Swagger setup is non-critical; source files may not exist on Vercel Lambda
+  }
 
 
 

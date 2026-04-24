@@ -103,7 +103,7 @@ const PerformanceAnalytics: React.FC<Props> = ({ trades }) => {
 
       <div className="h-40 min-h-[160px] w-full">
         {trades.length > 0 && isReady ? (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="colorPnl" x1="0" y1="0" x2="0" y2="1">

@@ -1,12 +1,10 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Pure-JS in-memory store — used on Vercel where native binaries can be
-// incompatible with the Lambda runtime. Mirrors the better-sqlite3 API for
-// the exact queries used in backend/index.ts.
 class InMemoryDatabase {
   private trades: Array<{
     id: string; asset: string; type: string;
@@ -78,13 +76,12 @@ class InMemoryDatabase {
 let db: any;
 
 if (process.env.VERCEL) {
-  // Vercel serverless: avoid native module entirely
   db = new InMemoryDatabase();
 } else {
   try {
-    // Dynamic import so bundlers don't hard-fail if the binary is missing
-    const mod = await import('better-sqlite3' as any);
-    const Database = (mod.default ?? mod) as any;
+    // Use createRequire for synchronous loading — no top-level await needed
+    const _require = createRequire(import.meta.url);
+    const Database = _require('better-sqlite3') as any;
     const dbPath = process.env.NODE_ENV === 'production'
       ? ':memory:'
       : path.join(__dirname, '../trading.db');
