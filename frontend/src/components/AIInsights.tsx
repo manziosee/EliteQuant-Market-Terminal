@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Sparkles, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Sparkles, RefreshCw, AlertTriangle } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
 const AIInsights: React.FC<Props> = ({ asset, marketData }) => {
   const [analysis, setAnalysis] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [rateLimited, setRateLimited] = useState(false);
 
   const analyze = async () => {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -24,6 +25,7 @@ const AIInsights: React.FC<Props> = ({ asset, marketData }) => {
     }
 
     setLoading(true);
+    setRateLimited(false);
     try {
       const ai = new GoogleGenAI({ apiKey });
       const stats = marketData.analysis?.[asset.toLowerCase()];
@@ -56,24 +58,26 @@ const AIInsights: React.FC<Props> = ({ asset, marketData }) => {
       const response = await ai.models.generateContent({
         model: "gemini-2.0-flash",
         contents: prompt,
-        config: {
-          responseMimeType: "application/json"
-        }
+        config: { responseMimeType: "application/json" }
       });
 
       if (response.text) {
         setAnalysis(JSON.parse(response.text));
       }
-    } catch (error) {
+    } catch (error: any) {
+      const is429 = error?.message?.includes('429') || error?.status === 429 ||
+        JSON.stringify(error)?.includes('RESOURCE_EXHAUSTED');
+      if (is429) {
+        setRateLimited(true);
+      }
       console.error('AI Analysis failed', error);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (asset) analyze();
-  }, [asset]);
+  // Removed auto-analyze on mount/asset change — user clicks Analyze to avoid
+  // burning free-tier quota every time the active asset switches.
 
   return (
     <div className="bg-[#15171A] border border-[#2D3139] border-l-[3px] border-l-[#00FF88] rounded-xl p-5 relative overflow-hidden group">
@@ -84,7 +88,7 @@ const AIInsights: React.FC<Props> = ({ asset, marketData }) => {
         </h3>
         <button onClick={analyze} disabled={loading} className="text-[10px] text-[#00FF88] hover:text-white font-bold uppercase disabled:opacity-50 flex items-center gap-1 transition-all">
           <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? 'Analyzing...' : 'Refresh'}
+          {loading ? 'Analyzing...' : analysis ? 'Refresh' : 'Analyze'}
         </button>
       </div>
 
@@ -92,6 +96,17 @@ const AIInsights: React.FC<Props> = ({ asset, marketData }) => {
         <div className="space-y-4 animate-pulse relative z-10">
           <div className="h-3 bg-white/5 rounded w-3/4"></div>
           <div className="h-3 bg-white/5 rounded w-1/2"></div>
+        </div>
+      ) : rateLimited ? (
+        <div className="relative z-10 p-4 bg-orange-500/[0.05] border border-orange-500/20 rounded-lg space-y-2">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-orange-400 shrink-0" />
+            <p className="text-[10px] font-bold text-orange-400 uppercase">Gemini Quota Exhausted</p>
+          </div>
+          <p className="text-[10px] text-gray-400 leading-relaxed">
+            Free-tier daily limit reached. Enable billing at{' '}
+            <span className="text-orange-400 font-mono">ai.google.dev</span> or wait for the quota to reset at midnight PT.
+          </p>
         </div>
       ) : analysis ? (
         <div className="space-y-4 relative z-10">
@@ -110,7 +125,7 @@ const AIInsights: React.FC<Props> = ({ asset, marketData }) => {
               </div>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 gap-3">
             <div className="p-3 bg-white/[0.02] border border-[#2D3139] rounded-lg">
               <p className="text-[9px] text-gray-500 uppercase mb-1">4H Outlook</p>
@@ -123,7 +138,9 @@ const AIInsights: React.FC<Props> = ({ asset, marketData }) => {
           </div>
         </div>
       ) : (
-        <p className="text-[10px] text-gray-500 italic text-center py-4">Initialize intelligence scan for {asset.toUpperCase()}</p>
+        <p className="text-[10px] text-gray-500 italic text-center py-4">
+          Click Analyze to run AI intelligence scan for {asset.toUpperCase()}
+        </p>
       )}
     </div>
   );
