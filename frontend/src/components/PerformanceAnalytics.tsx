@@ -35,16 +35,46 @@ const PerformanceAnalytics: React.FC<Props> = ({ trades }) => {
   }, [trades]);
 
   const metrics = React.useMemo(() => {
-    const buyTrades = trades.filter(t => t.type === 'BUY');
-    const sellTrades = trades.filter(t => t.type === 'SELL');
     const totalVolume = trades.reduce((acc, t) => acc + (t.price * t.amount), 0);
-    
+
+    const sorted = [...trades].sort((a, b) => a.timestamp - b.timestamp);
+    const buyPricesByAsset: Record<string, number[]> = {};
+    let wins = 0;
+    let sellCount = 0;
+    let totalPnL = 0;
+
+    for (const trade of sorted) {
+      if (trade.type === 'BUY') {
+        if (!buyPricesByAsset[trade.asset]) buyPricesByAsset[trade.asset] = [];
+        buyPricesByAsset[trade.asset].push(trade.price);
+      } else {
+        sellCount++;
+        const buys = buyPricesByAsset[trade.asset] || [];
+        const avgBuyPrice = buys.length > 0 ? buys.reduce((a, b) => a + b, 0) / buys.length : 0;
+        const pnl = (trade.price - avgBuyPrice) * trade.amount;
+        totalPnL += pnl;
+        if (avgBuyPrice === 0 || trade.price >= avgBuyPrice) wins++;
+      }
+    }
+
+    const winRate = sellCount > 0 ? ((wins / sellCount) * 100).toFixed(1) + '%' : '—';
+    const avgProfit = sellCount > 0
+      ? (totalPnL / sellCount >= 0 ? '+' : '') + '$' + Math.abs(totalPnL / sellCount).toLocaleString(undefined, { maximumFractionDigits: 0 })
+      : '—';
+
     return {
-      winRate: '64.2%', // Simulated for sandbox
-      avgProfit: '$1,204',
+      winRate,
+      avgProfit,
       totalTrades: trades.length,
       volume: totalVolume.toLocaleString(undefined, { maximumFractionDigits: 0 })
     };
+  }, [trades]);
+
+  const totalReturn = React.useMemo(() => {
+    const buyCost = trades.filter((t: Trade) => t.type === 'BUY').reduce((acc: number, t: Trade) => acc + t.price * t.amount, 0);
+    const sellRevenue = trades.filter((t: Trade) => t.type === 'SELL').reduce((acc: number, t: Trade) => acc + t.price * t.amount, 0);
+    if (buyCost === 0) return null;
+    return ((sellRevenue - buyCost) / buyCost) * 100;
   }, [trades]);
 
   return (
@@ -100,10 +130,14 @@ const PerformanceAnalytics: React.FC<Props> = ({ trades }) => {
 
       <div className="mt-4 flex items-center justify-between">
          <p className="text-[8px] text-gray-600 font-bold uppercase tracking-widest">Real-time Performance Curve</p>
-         <div className="flex items-center gap-1">
-            <TrendingUp className="w-3 h-3 text-[#00FF88]" />
-            <span className="text-[10px] font-black text-[#00FF88]">+12.4%</span>
-         </div>
+         {totalReturn !== null && (
+           <div className="flex items-center gap-1">
+             <TrendingUp className={`w-3 h-3 ${totalReturn >= 0 ? 'text-[#00FF88]' : 'text-red-500'}`} />
+             <span className={`text-[10px] font-black ${totalReturn >= 0 ? 'text-[#00FF88]' : 'text-red-500'}`}>
+               {totalReturn >= 0 ? '+' : ''}{totalReturn.toFixed(1)}%
+             </span>
+           </div>
+         )}
       </div>
     </div>
   );

@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Sparkles, RefreshCw } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 interface Props {
   asset: string;
   marketData: any;
@@ -14,8 +12,20 @@ const AIInsights: React.FC<Props> = ({ asset, marketData }) => {
   const [loading, setLoading] = useState(false);
 
   const analyze = async () => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      setAnalysis({
+        sentiment: 'Unavailable',
+        risk_score: 0,
+        prediction: 'API key not configured',
+        alpha_insight: 'Add GEMINI_API_KEY to your Vercel environment variables to enable AI-powered analysis.'
+      });
+      return;
+    }
+
     setLoading(true);
     try {
+      const ai = new GoogleGenAI({ apiKey });
       const stats = marketData.analysis?.[asset.toLowerCase()];
       if (!stats) return;
 
@@ -28,7 +38,7 @@ const AIInsights: React.FC<Props> = ({ asset, marketData }) => {
         ethereum: 'Ethereum',
         solana: 'Solana'
       };
-      
+
       const displayName = assetNameMap[asset.toLowerCase()] || asset;
 
       const prompt = `Perform a deep technical analysis for ${displayName}.
@@ -36,15 +46,15 @@ const AIInsights: React.FC<Props> = ({ asset, marketData }) => {
       - Quant Metrics: RSI: ${stats.rsi}, Trend: ${stats.trend}, Strength: ${stats.trendStrength}, Volatility: ${stats.volatility}
       - ML Prediction (Linear Regression): Next value approx $${stats.prediction || 'unknown'}
       - MACD Snapshot: ${JSON.stringify(stats.macd)}
-      
-      Compare these metrics and return JSON with keys: 
-      "sentiment" (Ultra Bullish/Bullish/Neutral/Bearish/Ultra Bearish), 
-      "risk_score" (0-100), 
+
+      Compare these metrics and return JSON with keys:
+      "sentiment" (Ultra Bullish/Bullish/Neutral/Bearish/Ultra Bearish),
+      "risk_score" (0-100),
       "prediction" (Next 4h outlook in 5 words),
       "alpha_insight" (One sentence high-value technical advice).`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json"
