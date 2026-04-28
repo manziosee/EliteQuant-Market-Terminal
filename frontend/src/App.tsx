@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { io } from 'socket.io-client';
 import axios from 'axios';
-import { LayoutDashboard, TrendingUp, History, Activity, Sparkles, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Activity, Download, Share2 } from 'lucide-react';
 import PriceTicker from './components/PriceTicker.tsx';
 import SystemStats from './components/SystemStats.tsx';
 import TradingChart from './components/TradingChart.tsx';
@@ -12,7 +12,7 @@ import CorrelationMatrix from './components/CorrelationMatrix.tsx';
 import MarketHeatmap from './components/MarketHeatmap.tsx';
 import NewsSentimentHub from './components/NewsSentimentHub.tsx';
 import PerformanceAnalytics from './components/PerformanceAnalytics.tsx';
-import { Download, Share2 } from 'lucide-react';
+import PriceAlerts from './components/PriceAlerts.tsx';
 
 // In production (Vercel serverless) WebSocket connections are not persistent.
 // Use a no-op object so the REST polling fallback handles all live data instead.
@@ -25,6 +25,7 @@ const App: React.FC = () => {
   const [activeAsset, setActiveAsset] = useState('bitcoin');
   const [tradeAmount, setTradeAmount] = useState(0.1);
   const [portfolio, setPortfolio] = useState<any>([]);
+  const [portfolioLoading, setPortfolioLoading] = useState(true);
   const [tradeError, setTradeError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,6 +63,8 @@ const App: React.FC = () => {
       setPortfolio(res.data);
     } catch {
       // API unavailable — keep default empty portfolio state
+    } finally {
+      setPortfolioLoading(false);
     }
   };
 
@@ -72,13 +75,19 @@ const App: React.FC = () => {
 
   const binanceSymbol = useMemo(() => {
     const map: any = {
-      'bitcoin': 'BINANCE:BTCUSDT',
-      'ethereum': 'BINANCE:ETHUSDT',
-      'solana': 'BINANCE:SOLUSDT',
-      'spy': 'AMEX:SPY',
-      'qqq': 'NASDAQ:QQQ',
-      'apple': 'NASDAQ:AAPL',
-      'tesla': 'NASDAQ:TSLA'
+      'bitcoin':   'BINANCE:BTCUSDT',
+      'ethereum':  'BINANCE:ETHUSDT',
+      'solana':    'BINANCE:SOLUSDT',
+      'cardano':   'BINANCE:ADAUSDT',
+      'polkadot':  'BINANCE:DOTUSDT',
+      'dogecoin':  'BINANCE:DOGEUSDT',
+      'ripple':    'BINANCE:XRPUSDT',
+      'chainlink': 'BINANCE:LINKUSDT',
+      'uniswap':   'BINANCE:UNIUSDT',
+      'spy':       'AMEX:SPY',
+      'qqq':       'NASDAQ:QQQ',
+      'apple':     'NASDAQ:AAPL',
+      'tesla':     'NASDAQ:TSLA',
     };
     return map[activeAsset] || 'BINANCE:BTCUSDT';
   }, [activeAsset]);
@@ -178,18 +187,24 @@ const App: React.FC = () => {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{activeAsset} / USDT</span>
                 <span className="text-lg font-mono font-bold text-[#00FF88]">${formatPrice(selectedAssetData.usd)}</span>
               </div>
-              <div className="flex gap-1 overflow-x-auto w-full sm:w-auto no-scrollbar pb-1 sm:pb-0">
+              <div className="flex gap-1 overflow-x-auto w-full sm:w-auto no-scrollbar pb-1 sm:pb-0 scrollbar-hide">
                 {[
-                  { id: 'bitcoin', label: 'BTC' },
-                  { id: 'ethereum', label: 'ETH' },
-                  { id: 'solana', label: 'SOL' },
-                  { id: 'spy', label: 'S&P 500' },
-                  { id: 'qqq', label: 'NASDAQ' },
-                  { id: 'apple', label: 'AAPL' },
-                  { id: 'tesla', label: 'TSLA' }
+                  { id: 'bitcoin',   label: 'BTC'     },
+                  { id: 'ethereum',  label: 'ETH'     },
+                  { id: 'solana',    label: 'SOL'     },
+                  { id: 'cardano',   label: 'ADA'     },
+                  { id: 'polkadot',  label: 'DOT'     },
+                  { id: 'dogecoin',  label: 'DOGE'    },
+                  { id: 'ripple',    label: 'XRP'     },
+                  { id: 'chainlink', label: 'LINK'    },
+                  { id: 'uniswap',   label: 'UNI'     },
+                  { id: 'spy',       label: 'S&P 500' },
+                  { id: 'qqq',       label: 'NASDAQ'  },
+                  { id: 'apple',     label: 'AAPL'    },
+                  { id: 'tesla',     label: 'TSLA'    },
                 ].map(asset => (
                   <button key={asset.id} onClick={() => setActiveAsset(asset.id)}
-                          className={`px-3 py-1 text-[9px] rounded-md font-bold transition-all whitespace-nowrap ${activeAsset === asset.id ? 'bg-[#00FF88]/10 text-[#00FF88] border border-[#00FF88]/20' : 'text-gray-500 hover:text-white'}`}>
+                          className={`px-3 py-1 text-[9px] rounded-md font-bold transition-all whitespace-nowrap flex-shrink-0 ${activeAsset === asset.id ? 'bg-[#00FF88]/10 text-[#00FF88] border border-[#00FF88]/20' : 'text-gray-500 hover:text-white'}`}>
                     {asset.label}
                   </button>
                 ))}
@@ -284,6 +299,8 @@ const App: React.FC = () => {
             </div>
           </div>
 
+          <PriceAlerts prices={marketData.crypto} />
+
           <div className="bg-[#15171A] border border-[#2D3139] rounded-xl p-5">
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex justify-between items-center">
               Account Portfolio
@@ -292,23 +309,44 @@ const App: React.FC = () => {
                 <LayoutDashboard className="w-3.5 h-3.5 text-[#00FF88]" />
               </div>
             </h3>
-            <div className="text-3xl font-mono font-black mb-6 pb-4 border-b border-white/5">${formatPrice(totalBalance)}</div>
+            <div className="text-3xl font-mono font-black mb-6 pb-4 border-b border-white/5">
+              {portfolioLoading
+                ? <div className="h-8 w-40 bg-white/5 rounded animate-pulse" />
+                : `$${formatPrice(totalBalance)}`
+              }
+            </div>
             <div className="space-y-3">
-              {portfolio.map((item: any) => (
-                <div key={item.asset} className="flex justify-between items-center group">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold uppercase text-white group-hover:text-[#00FF88] transition-colors">{item.asset}</span>
-                    {item.asset !== 'usd' && (
-                      <span className="text-[8px] text-gray-500 font-mono italic">
-                        Value: ${(item.quantity * (marketData.crypto[item.asset]?.usd || 0)).toLocaleString()}
-                      </span>
-                    )}
+              {portfolioLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex justify-between items-center">
+                    <div className="space-y-1">
+                      <div className="h-2.5 w-16 bg-white/5 rounded animate-pulse" />
+                      <div className="h-2 w-24 bg-white/5 rounded animate-pulse" />
+                    </div>
+                    <div className="h-2.5 w-12 bg-white/5 rounded animate-pulse" />
                   </div>
-                  <span className={`text-[11px] font-mono font-bold ${item.asset === 'usd' && item.quantity < 0 ? 'text-red-500 animate-pulse' : 'text-gray-400'}`}>
-                    {item.quantity.toFixed(4)}
-                  </span>
-                </div>
-              ))}
+                ))
+              ) : (
+                portfolio.map((item: any) => {
+                  const allPrices = { ...marketData.crypto, ...marketData.stocks };
+                  const assetPrice = allPrices[item.asset]?.usd || 0;
+                  return (
+                    <div key={item.asset} className="flex justify-between items-center group">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-bold uppercase text-white group-hover:text-[#00FF88] transition-colors">{item.asset}</span>
+                        {item.asset !== 'usd' && (
+                          <span className="text-[8px] text-gray-500 font-mono italic">
+                            Value: ${(item.quantity * assetPrice).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-[11px] font-mono font-bold ${item.asset === 'usd' && item.quantity < 0 ? 'text-red-500 animate-pulse' : 'text-gray-400'}`}>
+                        {item.quantity.toFixed(4)}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </aside>

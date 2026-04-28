@@ -8,14 +8,20 @@ const __dirname = path.dirname(__filename);
 class InMemoryDatabase {
   private trades: Array<{
     id: string; asset: string; type: string;
-    price: number; amount: number; timestamp: number;
+    price: number; amount: number; timestamp: number; pnl: number;
   }> = [];
 
   private portfolio = [
-    { asset: 'bitcoin', quantity: 1.25,      avg_price: 62000 },
-    { asset: 'ethereum', quantity: 15.4,      avg_price: 3400  },
-    { asset: 'solana',   quantity: 240.5,     avg_price: 145   },
-    { asset: 'usd',      quantity: 142509.42, avg_price: 1     },
+    { asset: 'bitcoin',   quantity: 1.25,      avg_price: 62000 },
+    { asset: 'ethereum',  quantity: 15.4,       avg_price: 3400  },
+    { asset: 'solana',    quantity: 240.5,      avg_price: 145   },
+    { asset: 'cardano',   quantity: 5000,       avg_price: 0.45  },
+    { asset: 'polkadot',  quantity: 100,        avg_price: 7.5   },
+    { asset: 'dogecoin',  quantity: 10000,      avg_price: 0.12  },
+    { asset: 'ripple',    quantity: 3000,       avg_price: 0.52  },
+    { asset: 'chainlink', quantity: 200,        avg_price: 14.5  },
+    { asset: 'uniswap',   quantity: 150,        avg_price: 10.0  },
+    { asset: 'usd',       quantity: 142509.42,  avg_price: 1     },
   ];
 
   prepare(sql: string) {
@@ -37,8 +43,8 @@ class InMemoryDatabase {
       },
       run(...args: any[]) {
         if (s.startsWith('insert into trades')) {
-          const [id, asset, type, price, amount, timestamp] = args;
-          self.trades.push({ id, asset, type, price: +price, amount: +amount, timestamp: +timestamp });
+          const [id, asset, type, price, amount, timestamp, pnl] = args;
+          self.trades.push({ id, asset, type, price: +price, amount: +amount, timestamp: +timestamp, pnl: +(pnl ?? 0) });
         } else if (s.includes("asset = 'usd'") && s.includes('quantity + ?')) {
           const usd = self.portfolio.find(p => p.asset === 'usd');
           if (usd) usd.quantity += +args[0];
@@ -79,7 +85,6 @@ if (process.env.VERCEL) {
   db = new InMemoryDatabase();
 } else {
   try {
-    // Use createRequire for synchronous loading — no top-level await needed
     const _require = createRequire(import.meta.url);
     const Database = _require('better-sqlite3') as any;
     const dbPath = process.env.NODE_ENV === 'production'
@@ -90,20 +95,27 @@ if (process.env.VERCEL) {
       CREATE TABLE IF NOT EXISTS trades (
         id TEXT PRIMARY KEY,
         asset TEXT NOT NULL,
-        type TEXT CHECK(type IN ('BUY', 'SELL')) NOT NULL,
+        type TEXT CHECK(type IN ('BUY','SELL')) NOT NULL,
         price REAL NOT NULL,
         amount REAL NOT NULL,
-        timestamp INTEGER NOT NULL
+        timestamp INTEGER NOT NULL,
+        pnl REAL NOT NULL DEFAULT 0
       );
       CREATE TABLE IF NOT EXISTS portfolio (
         asset TEXT PRIMARY KEY,
         quantity REAL NOT NULL DEFAULT 0,
         avg_price REAL NOT NULL DEFAULT 0
       );
-      INSERT OR IGNORE INTO portfolio (asset, quantity, avg_price) VALUES ('bitcoin', 1.25, 62000);
-      INSERT OR IGNORE INTO portfolio (asset, quantity, avg_price) VALUES ('ethereum', 15.4, 3400);
-      INSERT OR IGNORE INTO portfolio (asset, quantity, avg_price) VALUES ('solana', 240.5, 145);
-      INSERT OR IGNORE INTO portfolio (asset, quantity, avg_price) VALUES ('usd', 142509.42, 1);
+      INSERT OR IGNORE INTO portfolio (asset, quantity, avg_price) VALUES ('bitcoin',   1.25,      62000);
+      INSERT OR IGNORE INTO portfolio (asset, quantity, avg_price) VALUES ('ethereum',  15.4,      3400);
+      INSERT OR IGNORE INTO portfolio (asset, quantity, avg_price) VALUES ('solana',    240.5,     145);
+      INSERT OR IGNORE INTO portfolio (asset, quantity, avg_price) VALUES ('cardano',   5000,      0.45);
+      INSERT OR IGNORE INTO portfolio (asset, quantity, avg_price) VALUES ('polkadot',  100,       7.5);
+      INSERT OR IGNORE INTO portfolio (asset, quantity, avg_price) VALUES ('dogecoin',  10000,     0.12);
+      INSERT OR IGNORE INTO portfolio (asset, quantity, avg_price) VALUES ('ripple',    3000,      0.52);
+      INSERT OR IGNORE INTO portfolio (asset, quantity, avg_price) VALUES ('chainlink', 200,       14.5);
+      INSERT OR IGNORE INTO portfolio (asset, quantity, avg_price) VALUES ('uniswap',   150,       10.0);
+      INSERT OR IGNORE INTO portfolio (asset, quantity, avg_price) VALUES ('usd',       142509.42, 1);
     `);
     db = sqlite;
   } catch {
